@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Server",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/server",
+            "args": [
+                "${workspaceFolder}/data/testing"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "print_table",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/print_table",
+            "args": [
+                "r"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "test_update",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_update",
+            "args": [
+                "r"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "test_vacuum",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_vacuum",
+            "args": [
+                "r"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "create_db",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/create_db",
+            "args": [
+                "${workspaceFolder}/data/testing"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        }
+    ]
+}
