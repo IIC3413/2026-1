@@ -26,7 +26,7 @@ public:
   // inserts a new record
   RID insert_record(const Record& record, TxID tx_id, std::optional<RID> first_rid = std::nullopt);
 
-  void delete_record(RID rid, TxID tx_id);
+  void delete_record(RID rid, TxID);
 
   // update record at rid with record managing versions, concurrency and locks.
   RID update(RID rid, const Record& record, TxID tx_id);

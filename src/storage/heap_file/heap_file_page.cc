@@ -166,6 +166,7 @@ bool HeapFilePage::try_insert_record(
 
   auto free_space = get_free_space();
   //TODO: Lab 1
+  // Hint: missing add the record header to needed_record_size
   return true;
 }
 
