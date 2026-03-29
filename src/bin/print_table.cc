@@ -13,6 +13,9 @@ void print_records(const HeapFile& heap_file) {
   for (auto i = 0; i < total_pages; i++) {
     auto page = std::make_unique<HeapFilePage>(heap_file, i);
     for (int dir_slot = 0; dir_slot < page->get_dir_count(); dir_slot++) {
+      if (page->get_dir(dir_slot) <= 0) {
+        continue;
+      }
       auto final_rid = heap_file.get_last_version(RID(i, dir_slot));
       auto page_of_record = std::make_unique<HeapFilePage>(heap_file, final_rid.page_num);
       auto record = page_of_record->get_record(final_rid.dir_slot);

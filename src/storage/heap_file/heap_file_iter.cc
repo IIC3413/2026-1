@@ -42,9 +42,8 @@ Record HeapFileIter::next() {
       continue;
     }
     if (RID(current_page_number, current_page_record_pos) == current_record.first) {
-      bool valid = false;
       auto new_rid = heap_file.get_last_version(current_rid);
-      if (!valid) {
+      if (new_rid == RID(-1, -2)) {
         continue;
       }
       auto record = heap_file.get_record(new_rid);

@@ -32,6 +32,9 @@ RID HeapFile::get_last_version(const RID& rid) const {
   while (true) {
     auto page = std::make_unique<HeapFilePage>(*this, current_rid.page_num);
     const auto record_header = page->get_record_header(current_rid.dir_slot);
+    if (record_header.is_invalid()) {
+      return RID(-1, -2);
+    }
     RID next_rid = record_header.next;
     if (current_rid == next_rid) {
       break;
