@@ -296,17 +296,24 @@ FileId Catalog::get_file_id(const std::string& table_name, TableId table_id) {
 void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx_id) {
   auto normalized_table_name = normalize(table_name);
 
-  TableInfo* table_info;
+  TableInfo* table_info = nullptr;
   for (const auto& [table_id, tinfo] : table_id2table_info) {
     if (tinfo->name == normalized_table_name) {
       table_info = tinfo.get();
     }
   }
+  if (table_info == nullptr) {
+    throw QueryException("Table `" + table_name + "` not found");
+  }
 
-  int key_col_idx;
+  int key_col_idx = -1;
   auto columns = table_info->schema->columns;
   for (size_t c = 0; c < columns.size(); ++c) {
-    if (columns[c].name == column_name) key_col_idx = c;
+    if (columns[c].name == column_name)
+      key_col_idx = c;
+  }
+  if (key_col_idx == -1) {
+    throw QueryException("Column `" + column_name + "` not found in table `" + table_name + "`");
   }
 
   auto index_count = table_info->indexes.size();
