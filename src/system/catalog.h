@@ -29,7 +29,7 @@ public:
   // Doesn't support concurrency
   void vacuum();
 
-  void delete_record(const std::string& table_name, RID rid, TxID tx_id);
+  void delete_record(const std::string& table_name, RID rid);
 
   const TableInfo* get_table_info(const std::string& table_name);
 
@@ -43,6 +43,9 @@ public:
     return transaction_count.fetch_add(1);
   }
 
+  void create_index(const std::string& table_name, const std::string& column_name, TxID tx_id);
+
+  const std::unique_ptr<Index>& get_index(const std::string& table_name, IndexId index_id);
 private:
   std::shared_mutex tables_mutex;
 

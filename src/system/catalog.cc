@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 #include "exceptions/exceptions.h"
 #include "relational_model/schema.h"
 #include "storage/heap_file/heap_file.h"
 #include "system/system.h"
+#include "storage/linear_hash_index/hash_index.h"
 
 using namespace std;
 
@@ -62,9 +64,32 @@ Catalog::Catalog(const string& filename) {
     auto table_file_id = get_file_id(table_name, table_id);
     auto heap_file = std::make_unique<HeapFile>(schema_ref, table_file_id, table_id);
 
+    std::vector<std::unique_ptr<Index>> index;
+    int64_t index_counter = read_int64();
+
+    for (int64_t j = 0; j < index_counter; ++j) {
+      IndexType index_type = static_cast<IndexType>(read_int64());
+      // IndexId index_id = read_int64();
+      switch (index_type) {
+      case IndexType::LINEAR_HASH_INDEX: {
+
+        auto key_col_idx = read_int64();
+        FileId dir_file_id = file_mgr.get_file_id(normalize(table_name) + "." + std::to_string(j) + ".dir");
+        FileId buckets_file_id = file_mgr.get_file_id(normalize(table_name) + "." + std::to_string(j)+ ".hidx");
+
+        index.push_back(std::make_unique<HashIndex>(*heap_file, key_col_idx, dir_file_id, buckets_file_id));
+        break;
+      }
+      case IndexType::B_PLUS_TREE:
+        break;
+      case IndexType::NONE:
+        break;
+      }
+    }
+
     table_id2table_info.insert(
         {table_id, std::make_unique<TableInfo>(
-                       table_name, std::move(schema), std::move(heap_file), table_id, table_cardinality
+                       table_name, std::move(schema), std::move(heap_file), table_id, table_cardinality, std::move(index)
                    )}
     );
   }
@@ -85,6 +110,26 @@ Catalog::~Catalog() {
     for (size_t i = 0; i < schema->columns.size(); i++) {
       write_int64(static_cast<int64_t>(schema->columns[i].datatype));
       write_string(schema->columns[i].name);
+    }
+    // write indexes
+    write_int64(table_info->indexes.size());
+    if (!table_info->indexes.empty()) {
+      for (auto& index : table_info->indexes) {
+        auto index_type = index->get_type();
+        write_int64(static_cast<uint64_t>(index_type));
+
+        switch (index_type) {
+        case IndexType::LINEAR_HASH_INDEX: {
+          auto casted = reinterpret_cast<HashIndex*>(index.get());
+          write_int64(casted->key_column_idx);
+          break;
+        }
+        case IndexType::B_PLUS_TREE:
+          break;
+        case IndexType::NONE:
+          break;
+        }
+      }
     }
   }
 
@@ -167,16 +212,28 @@ RID Catalog::insert_record(const std::string& table_name, const Record& record, 
   }
   RID rid = table_info->heap_file->insert_record(record, tx_id);
 
+  if (!table_info->indexes.empty()) {
+    for (auto& index : table_info->indexes) {
+      index->insert_record(rid);
+    }
+  }
+
   return rid;
 }
 
-void Catalog::delete_record(const std::string& table_name, RID rid, TxID tx_id) {
+void Catalog::delete_record(const std::string& table_name, RID rid) {
   auto table_info = get_table_info(table_name);
   if (table_info == nullptr) {
     throw QueryException("Table `" + table_name + "` does not exist.");
   }
+
+  if (!table_info->indexes.empty()) {
+    for (auto& index : table_info->indexes) {
+      index->delete_record(rid);
+    }
+  }
   // MUST delete from the index before the table, otherwise rid will be invalid
-  table_info->heap_file->delete_record(rid, tx_id);
+  table_info->heap_file->delete_record(rid);
 }
 
 RID Catalog::update_record(const std::string& table_name, RID rid, const Record& record, TxID tx_id) {
@@ -210,9 +267,10 @@ void Catalog::vacuum() {
 
 const TableInfo* Catalog::get_table_info(const std::string& table_name) {
   std::shared_lock lock(tables_mutex);
+  std::string normalized_table_name = normalize(table_name);
 
   for (const auto& [table_id, table_info] : table_id2table_info) {
-    if (table_info->name == table_name) {
+    if (table_info->name == normalized_table_name) {
       return table_info.get();
     }
   };
@@ -233,4 +291,39 @@ const TableInfo* Catalog::get_table_info(TableId table_id) {
 FileId Catalog::get_file_id(const std::string& table_name, TableId table_id) {
   std::string filename = to_string(table_id) + "_" + table_name + ".tbl";
   return file_mgr.get_file_id(filename);
+}
+
+void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx_id) {
+  auto normalized_table_name = normalize(table_name);
+
+  TableInfo* table_info;
+  for (const auto& [table_id, tinfo] : table_id2table_info) {
+    if (tinfo->name == normalized_table_name) {
+      table_info = tinfo.get();
+    }
+  }
+
+  int key_col_idx;
+  auto columns = table_info->schema->columns;
+  for (size_t c = 0; c < columns.size(); ++c) {
+    if (columns[c].name == column_name) key_col_idx = c;
+  }
+
+  auto index_count = table_info->indexes.size();
+  FileId dir_file_id = file_mgr.get_file_id(normalize(table_name) + "." + std::to_string(index_count) + ".dir");
+  FileId buckets_file_id = file_mgr.get_file_id(normalize(table_info->name) + "." + std::to_string(index_count) + ".hidx");
+
+  table_info->indexes.push_back(std::make_unique<HashIndex>(*table_info->heap_file, key_col_idx, dir_file_id, buckets_file_id));
+
+  auto iter = table_info->heap_file->get_record_iter(tx_id);
+  iter->begin();
+  while (!iter->next().invalid()) {
+    table_info->indexes[index_count]->insert_record(iter->get_current_RID());
+  }
+}
+
+const std::unique_ptr<Index>& Catalog::get_index(const std::string& table_name, IndexId index_id) {
+  auto table_info = get_table_info(table_name);
+  assert(index_id < table_info->indexes.size());
+  return table_info->indexes[index_id];
 }

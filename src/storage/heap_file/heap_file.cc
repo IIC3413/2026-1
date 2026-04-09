@@ -38,6 +38,9 @@ RID HeapFile::get_last_version(const RID& rid) const {
     RID next_rid = record_header.next;
     if (current_rid == next_rid) {
       break;
+    } else {
+      RID next_rid = record_header.next;
+      current_rid = next_rid;
     }
     current_rid = next_rid;
   }
@@ -46,20 +49,38 @@ RID HeapFile::get_last_version(const RID& rid) const {
 
 // update record managing versions and concurrency
 RID HeapFile::update(RID rid, const Record& record, TxID tx_id) {
-  // TODO: Lab 1
-  return RID(-1, -1);
+  const auto record_header_to_update = get_record_header(rid);
+
+  if (record_header_to_update.is_invalid()) {
+    return RID(-1, -2); // record deleted physically
+  }
+  RID to_update_rid = get_last_version(record_header_to_update.first);
+  RID new_rid = insert_record(record, tx_id, record_header_to_update.first);
+
+  HeapFilePage page(*this, to_update_rid.page_num);
+  page.update_record_header(to_update_rid.dir_slot, new_rid, tx_id);
+
+  return new_rid;
 }
 
 std::unique_ptr<HeapFileIter> HeapFile::get_record_iter(TxID tx_id) const {
   return std::make_unique<HeapFileIter>(*this, tx_id);
 }
 
-void HeapFile::delete_record(RID rid, TxID) {
+void HeapFile::delete_record(RID rid) {
   auto current_record_header = get_record_header(rid);
   if (current_record_header.is_invalid())
     return;
   auto page = std::make_unique<HeapFilePage>(*this, rid.page_num);
   page->delete_record_physically(rid.dir_slot);
+  while (current_record_header.t_max != 0) {
+    current_record_header = get_record_header(current_record_header.next);
+    if (current_record_header.is_invalid()) {
+      break;
+    }
+    page = std::make_unique<HeapFilePage>(*this, current_record_header.next.page_num);
+    page->delete_record_physically(current_record_header.next.dir_slot);
+  }
 }
 
 void HeapFile::vacuum() {

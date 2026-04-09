@@ -55,9 +55,11 @@ target_compile_definitions(iic3413db PUBLIC SERD_STATIC)
 
 set(BUILD_TARGETS
     create_db
+    test_index_insertion
+    test_index_deletion
     print_table
-    test_update
-    test_vacuum
+    print_index
+    test_split
 )
 
 # Build targets

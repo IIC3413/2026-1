@@ -1,5 +1,6 @@
 #include "value.h"
 #include "exceptions/exceptions.h"
+#include "third_party/murmur3/murmur3.h"
 
 Value::Value(int64_t i)
     : value(i) {}
@@ -16,6 +17,18 @@ Value::Value(std::string&& str_value)
 
 Value::Value(RID rid)
     : value(rid) {}
+
+uint64_t Value::get_hash() const {
+  uint64_t _hash[2];
+  if (is_int()) {
+    auto a = as_int();
+    MurmurHash3_x64_128(&a, sizeof(a), 0, _hash);
+  } else if (is_string()) {
+    auto s = as_string();
+    MurmurHash3_x64_128(s.data(), s.length(), 0, _hash);
+  }
+  return _hash[0];
+}
 
 bool Value::operator<(const Value& other) const {
   return value < other.value;

@@ -165,8 +165,57 @@ bool HeapFilePage::try_insert_record(
   }
 
   auto free_space = get_free_space();
-  //TODO: Lab 1
-  // Hint: missing add the record header to needed_record_size
+
+  if (dir_pos < dir_count) { // found dir to reuse
+    if (free_space < needed_record_size + TUPLE_HEADER_SIZE) {
+      return false;
+    }
+    free_space -= needed_record_size + TUPLE_HEADER_SIZE;
+  } else { // dir_pos == dir_count
+    if (free_space < needed_record_size + TUPLE_HEADER_SIZE + DIR_SIZE) {
+      return false;
+    }
+    dir_count++;
+    set_dir_count(dir_count);
+    free_space -= needed_record_size + TUPLE_HEADER_SIZE + DIR_SIZE;
+  }
+  set_free_space(free_space);
+
+  int32_t offset = HEADER_SIZE + DIR_SIZE * dir_count + free_space;
+  set_dir(dir_pos, offset);
+
+  *out_rid = RID(page.page_id.page_number, dir_pos);
+
+  // write tuple header
+  page.write_int64(offset + TMIN_OFFSET, tx_id); // t_min
+  page.write_int64(offset + TMAX_OFFSET, 0);     // t_max
+
+  page.write_int32(offset + NEXT_RID_PAGE_OFFSET, page.page_id.page_number);    // next RID page
+  page.write_int32(offset + NEXT_RID_DIR_OFFSET, dir_pos);                      // next RID dir
+  if (first_rid == std::nullopt) {                                              // first version
+    page.write_int32(offset + FIRST_RID_PAGE_OFFSET, page.page_id.page_number); // first RID page
+    page.write_int32(offset + FIRST_RID_DIR_OFFSET, dir_pos);                   // first RID dir
+  } else {                                                                      // update version
+    page.write_int32(offset + FIRST_RID_PAGE_OFFSET, first_rid->page_num);      // first RID page
+    page.write_int32(offset + FIRST_RID_DIR_OFFSET, first_rid->dir_slot);       // first RID dir
+  }
+  offset += TUPLE_HEADER_SIZE;
+
+  // write record data
+  for (auto& value : record.values) {
+    if (value.is_string()) {
+      auto str = value.as_string();
+      uint8_t len = str.size();
+      page.write_int8(offset, len);
+      offset += 1;
+
+      page.write(offset, len, str.data());
+      offset += len;
+    } else if (value.is_int()) {
+      page.write_int64(offset, value.as_int());
+      offset += sizeof(int64_t);
+    }
+  }
   return true;
 }
 
@@ -189,6 +238,45 @@ void HeapFilePage::update_record_header(int32_t dir_pos, RID new_rid, TxID tx_id
 
 void HeapFilePage::vacuum() {
   char* page_buf = new char[Page::SIZE];
-  //TODO: Lab 1
+  int32_t dir_count = 0;
+  int32_t last_useful_dir_count = 0;
+  int32_t free_space = Page::SIZE - HEADER_SIZE;
+  auto dirs = reinterpret_cast<int32_t*>(page_buf + HEADER_SIZE);
+
+  for (int32_t i = 0; i < get_dir_count(); i++) {
+    // we maintain the RID of the non deleted records
+    free_space -= DIR_SIZE;
+    if (get_dir(i) < 0) {
+      dirs[i] = -1;
+      dir_count++;
+      continue;
+    } else {
+      last_useful_dir_count = dir_count;
+    }
+
+    int32_t record_size = TUPLE_HEADER_SIZE;
+    for (auto& value : get_record(i).values) {
+      if (value.is_string()) {
+        record_size += 1 + value.as_string().size();
+      } else if (value.is_int()) {
+        record_size += sizeof(int64_t);
+      }
+    }
+
+    dir_count += 1;
+    free_space -= record_size;
+
+    auto offset = HEADER_SIZE + DIR_SIZE * dir_count + free_space;
+    dirs[dir_count - 1] = offset;
+    page.read(get_dir(i), record_size, page_buf + offset);
+  }
+
+  last_useful_dir_count++;
+  free_space += (dir_count - last_useful_dir_count) * DIR_SIZE;
+  dir_count = last_useful_dir_count;
+
+  page.write(0, Page::SIZE, page_buf);
+  page.write_int32(0, dir_count);
+  page.write_int32(4, free_space);
   delete[] page_buf;
 }

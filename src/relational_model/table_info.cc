@@ -8,10 +8,15 @@ TableInfo::TableInfo(
     std::unique_ptr<Schema> _schema,
     std::unique_ptr<HeapFile> heap_file,
     TableId table_id,
-    uint64_t cardinality
+    uint64_t cardinality,
+    std::vector<std::unique_ptr<Index>> indexes
 )
     : name(name),
       schema(std::move(_schema)),
       heap_file(std::move(heap_file)),
       table_id(table_id),
-      cardinality(cardinality) {}
+      cardinality(cardinality) {
+        if (!indexes.empty()) {
+            this->indexes = std::move(indexes);
+        }
+      }

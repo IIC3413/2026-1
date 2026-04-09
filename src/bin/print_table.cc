@@ -28,7 +28,7 @@ void print_records(const HeapFile& heap_file) {
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
-    std::cout << "Usage: test_update <table_name> <args...>" << std::endl;
+    std::cout << "Usage: .../print_table <table_name>" << std::endl;
     return EXIT_FAILURE;
   }
   auto system = System("data/example_db");
