@@ -77,7 +77,7 @@ void fill_table1(HeapFile& heap_file) {
 
 void fill_table2(HeapFile& heap_file) {
   // Schema2 = {A: str, B: int, C: int}
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 256; i++) {
     Value valA("a" + std::to_string(i + 10));
     Value valB(1);
     Value valC(2 * i);

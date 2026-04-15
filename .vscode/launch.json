@@ -2,17 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Server",
-            "type": "lldb",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/bin/server",
-            "args": [
-                "${workspaceFolder}/data/testing"
-            ],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Debug Build"
-        },
-        {
             "name": "print_table",
             "type": "lldb",
             "request": "launch",
@@ -23,28 +12,17 @@
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Debug Build"
         },
-        {
-            "name": "test_update",
+       {
+            "name": "print_index",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/bin/test_update",
+            "program": "${workspaceFolder}/build/Debug/bin/print_index",
             "args": [
                 "r"
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Debug Build"
-        },
-        {
-            "name": "test_vacuum",
-            "type": "lldb",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/bin/test_vacuum",
-            "args": [
-                "r"
-            ],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Debug Build"
-        },
+        }, 
         {
             "name": "create_db",
             "type": "lldb",
@@ -53,6 +31,33 @@
             "args": [
                 "${workspaceFolder}/data/testing"
             ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "index insert",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_index_insertion",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "index delete",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_index_deletion",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        },
+        {
+            "name": "index redistribute",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_redistribute",
+            "args": [],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Debug Build"
         }

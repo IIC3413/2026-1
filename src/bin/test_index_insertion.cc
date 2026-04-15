@@ -3,6 +3,29 @@
 #include "storage/linear_hash_index/hash_index.h"
 #include "system/system.h"
 
+/*
+Expected output:
+
+Record: (0,1,"value: 1")
+Record: (1,1,"value: 2")
+Record: (2,1,"value: 3")
+Record: (3,1,"value: 4")
+Record: (4,1,"value: 5")
+
+print_index output:
+
+Bucket page [0]: (0,0) | (0,1) | (0,2) | (0,3) | (0,4)
+Bucket page [1]:
+Bucket page [2]:
+Bucket page [3]:
+Bucket page [4]:
+Bucket page [5]:
+Bucket page [6]:
+Bucket page [7]:
+Bucket page [8]:
+Bucket page [9]:
+*/
+
 int main() {
   std::filesystem::path dirPath = "data/example_db";
   auto system = System(dirPath);

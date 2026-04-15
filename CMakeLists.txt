@@ -59,7 +59,8 @@ set(BUILD_TARGETS
     test_index_deletion
     print_table
     print_index
-    test_split
+    test_redistribute
+    #test_split
 )
 
 # Build targets
