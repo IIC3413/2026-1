@@ -84,6 +84,7 @@ void FileManager::delete_file(FileId file_id) {
     }
   }
   if (!file_path.empty()) {
+    close(file_id.fd);
     Filesystem::remove(get_file_path(file_path));
   }
 }

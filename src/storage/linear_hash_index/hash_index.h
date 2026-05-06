@@ -2,7 +2,6 @@
 
 #include "hash_index_dir.h"
 #include "relational_model/index.h"
-#include "relational_model/record.h"
 #include "relational_model/relation_iter.h"
 #include "storage/file_id.h"
 #include "storage/heap_file/heap_file.h"

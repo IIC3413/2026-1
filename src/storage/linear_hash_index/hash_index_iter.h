@@ -1,8 +1,8 @@
 #pragma once
 
 #include "hash_index.h"
-#include "storage/linear_hash_index/hash_index_bucket.h"
 #include "relational_model/relation_iter.h"
+#include "storage/linear_hash_index/hash_index_bucket.h"
 
 class HashIndexIter : public RelationIter {
 public:

@@ -33,6 +33,7 @@ public:
   // just to test recovery
   void fake_flush();
 
+  // deletes the file from the disk, also removes all of its pages in the buffer manager
   void delete_file(FileId file_id);
 
   // delete a page only from the buffer pool

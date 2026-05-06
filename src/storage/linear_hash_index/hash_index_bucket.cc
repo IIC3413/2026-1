@@ -60,5 +60,23 @@ bool BucketPage::try_insert_record(uint64_t hash, RID rid) {
 }
 
 void BucketPage::delete_record(RID rid) {
-  // TODO: 2
+  int pos = 0;
+
+  while (pos < get_tuple_count()) {
+    HashIndexRecord current = get_record(pos);
+
+    if (current.rid == rid) {
+      int last_index = get_tuple_count() - 1;
+
+      if (pos != last_index) {
+        HashIndexRecord last = get_record(last_index);
+        set_record(pos, last);
+      }
+
+      set_tuple_count(last_index);
+
+    } else {
+      ++pos;
+    }
+  }
 }

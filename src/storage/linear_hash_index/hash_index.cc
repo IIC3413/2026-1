@@ -6,7 +6,6 @@
 #include "system/system.h"
 
 #include <cmath>
-#include <iostream>
 
 HashIndex::HashIndex(
     const HeapFile& heap_file, size_t key_column_idx, FileId dir_file_id, FileId buckets_file_id, size_t N
@@ -71,7 +70,13 @@ void HashIndex::insert_record(RID rid) {
 
   bool new_overflow_page = false;
   while (!current_bucket_page->try_insert_record(hash, rid)) {
-    // TODO: 1
+    auto overflow_pointer = current_bucket_page->get_overflow_pointer();
+    if (overflow_pointer == -1) {
+      overflow_pointer = get_new_bucket_page();
+      current_bucket_page->set_overflow_pointer(overflow_pointer);
+      new_overflow_page = true;
+    }
+    current_bucket_page = std::make_unique<BucketPage>(*this, overflow_pointer);
   }
 
   if (new_overflow_page) {
@@ -97,7 +102,6 @@ void HashIndex::split() {
   int32_t new_bucket_page_number = get_new_bucket_page();
   dir.set_bucket_page(bucket_count, new_bucket_page_number);
 
-
   redistribute(split_bucket_page_number, new_bucket_page_number);
 
   auto current_page_number = split_bucket_page_number;
@@ -108,7 +112,8 @@ void HashIndex::split() {
     BucketPage current_bucket_page(*this, current_page_number);
     next_page_number = current_bucket_page.get_overflow_pointer();
 
-    if (next_page_number == -1) break;
+    if (next_page_number == -1)
+      break;
 
     BucketPage next_bucket_page(*this, next_page_number);
     if (next_bucket_page.get_tuple_count() == 0) {
@@ -152,5 +157,45 @@ void HashIndex::delete_record(RID rid) {
 }
 
 void HashIndex::redistribute(const int split_bucket_page_number, const int new_bucket_page_number) {
-  // TODO: 3
+  auto read_bucket = std::make_unique<BucketPage>(*this, split_bucket_page_number);
+  auto write_old_bucket = std::make_unique<BucketPage>(*this, split_bucket_page_number);
+  auto write_new_bucket = std::make_unique<BucketPage>(*this, new_bucket_page_number);
+
+  // must save tuple_count as it may change later when write_old_bucket receives inserts
+  auto read_tuple_count = read_bucket->get_tuple_count();
+  write_old_bucket->set_tuple_count(0);
+
+  while (read_bucket != nullptr) {
+    for (int i = 0; i < read_tuple_count; ++i) {
+      HashIndexRecord hash_record = read_bucket->get_record(i);
+      int32_t record_bucket_idx = hash_to_bucket_idx(hash_record.hash, depth + 1);
+      int32_t old_bucket_idx = hash_to_bucket_idx(hash_record.hash, depth);
+
+      if (record_bucket_idx == old_bucket_idx) {
+        if (!write_old_bucket->try_insert_record(hash_record.hash, hash_record.rid)) {
+          auto old_overflow = write_old_bucket->get_overflow_pointer();
+          // reader is not finished yet, and old writer must be behind or at same position
+          // than reader, so overflow must exist
+          assert(old_overflow != -1);
+          write_old_bucket = std::make_unique<BucketPage>(*this, old_overflow);
+          write_old_bucket->try_insert_record(hash_record.hash, hash_record.rid);
+        }
+      } else {
+        if (!write_new_bucket->try_insert_record(hash_record.hash, hash_record.rid)) {
+          auto new_page_number = get_new_bucket_page();
+          write_new_bucket->set_overflow_pointer(new_page_number);
+          write_new_bucket = std::make_unique<BucketPage>(*this, new_page_number);
+          write_new_bucket->try_insert_record(hash_record.hash, hash_record.rid);
+        }
+      }
+    }
+    // keep reading for next iteration if overflow exists
+    if (auto overflow_pointer = read_bucket->get_overflow_pointer(); overflow_pointer != -1) {
+      read_bucket = std::make_unique<BucketPage>(*this, overflow_pointer);
+      read_tuple_count = read_bucket->get_tuple_count();
+      read_bucket->set_tuple_count(0);
+    } else {
+      read_bucket = nullptr;
+    }
+  }
 }

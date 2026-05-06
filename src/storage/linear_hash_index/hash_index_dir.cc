@@ -53,7 +53,9 @@ size_t HashIndexDir::get_bucket_page(size_t idx) const {
     return first_page.read_int32(pos);
   } else {
     auto& other_page = buffer_mgr.get_page(h_idx.dir_file_id, page_num);
-    return other_page.read_int32(pos);
+    auto res = other_page.read_int32(pos);
+    other_page.unpin();
+    return res;
   }
 }
 
@@ -68,5 +70,6 @@ void HashIndexDir::set_bucket_page(size_t idx, uint32_t bucket_page) {
   } else {
     auto& other_page = buffer_mgr.get_page(h_idx.dir_file_id, page_num);
     other_page.write_int32(pos, bucket_page);
+    other_page.unpin();
   }
 }

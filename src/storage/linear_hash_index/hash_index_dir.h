@@ -6,6 +6,7 @@ class HashIndex;
 
 class HashIndexDir {
   friend class HashIndex;
+
 public:
   static constexpr size_t INITIAL_BUCKET_COUNT_OFFSET = 0;
   static constexpr size_t SPLIT_POINTER_OFFSET = 4;
@@ -38,4 +39,3 @@ private:
 
   Page& first_page;
 };
-

@@ -10,6 +10,7 @@ TransactionManager::~TransactionManager() {
   for (auto& [tx_id, transaction] : active_transactions) {
     transaction->abort();
     lock_mgr.release_all_locks(*transaction);
+    catalog.abort_in_progress_tables(tx_id);
     transaction->set_state(TransactionState::COMMITTED);
   }
   active_transactions.clear();
@@ -56,6 +57,7 @@ void TransactionManager::commit_transaction(TxID tx_id) {
   }
   transaction.state = TransactionState::COMMITTED;
   lock_mgr.release_all_locks(transaction);
+  catalog.commit_in_progress_tables(tx_id);
   active_transactions.erase(it);
 }
 
@@ -70,6 +72,7 @@ void TransactionManager::abort_transaction(TxID tx_id) {
   // Undo changes made by this transaction
   transaction.abort();
   lock_mgr.release_all_locks(transaction);
+  catalog.abort_in_progress_tables(tx_id);
   transaction.set_state(TransactionState::COMMITTED);
   active_transactions.erase(it);
 }

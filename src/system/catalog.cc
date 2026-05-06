@@ -174,10 +174,11 @@ void Catalog::write_string(const string& s) {
   file.write(s.c_str(), s.size());
 }
 
-const TableInfo* Catalog::create_table(const std::string& table_name, const Schema& schema) {
+const TableInfo*
+Catalog::create_table(const std::string& table_name, const Schema& schema, TxID tx_id) {
   std::string normalized_table_name = normalize(table_name);
 
-  auto table_exists = get_table_info(normalized_table_name);
+  auto table_exists = get_table_info(normalized_table_name, tx_id);
   if (table_exists != nullptr) {
     throw QueryException("Table `" + table_name + "` already exists.");
   }
@@ -201,12 +202,12 @@ const TableInfo* Catalog::create_table(const std::string& table_name, const Sche
       normalized_table_name, std::make_unique<Schema>(final_schema), std::move(heap_file), table_id, 0
   );
 
-  table_id2table_info.insert({table_id, std::move(table_info)});
-  return table_id2table_info.at(table_id).get();
+  in_process_tables[tx_id].push_back(std::move(table_info));
+  return in_process_tables[tx_id].back().get();
 }
 
 RID Catalog::insert_record(const std::string& table_name, const Record& record, TxID tx_id) {
-  auto table_info = get_table_info(table_name);
+  auto table_info = get_table_info(table_name, tx_id);
   if (table_info == nullptr) {
     throw QueryException("Table `" + table_name + "` does not exist.");
   }
@@ -217,12 +218,11 @@ RID Catalog::insert_record(const std::string& table_name, const Record& record, 
       index->insert_record(rid);
     }
   }
-
   return rid;
 }
 
-void Catalog::delete_record(const std::string& table_name, RID rid) {
-  auto table_info = get_table_info(table_name);
+void Catalog::delete_record(const std::string& table_name, RID rid, TxID tx_id) {
+  auto table_info = get_table_info(table_name, tx_id);
   if (table_info == nullptr) {
     throw QueryException("Table `" + table_name + "` does not exist.");
   }
@@ -234,10 +234,13 @@ void Catalog::delete_record(const std::string& table_name, RID rid) {
   }
   // MUST delete from the index before the table, otherwise rid will be invalid
   table_info->heap_file->delete_record(rid);
+
 }
 
-RID Catalog::update_record(const std::string& table_name, RID rid, const Record& record, TxID tx_id) {
-  auto table_info = get_table_info(table_name);
+RID Catalog::update_record(
+    const std::string& table_name, RID rid, const Record& record, TxID tx_id
+) {
+  auto table_info = get_table_info(table_name, tx_id);
 
   if (table_info == nullptr) {
     throw QueryException("Table `" + table_name + "` does not exist.");
@@ -248,7 +251,7 @@ RID Catalog::update_record(const std::string& table_name, RID rid, const Record&
   return heap_file->update(rid, record, tx_id);
 }
 
-void Catalog::vacuum() {
+void Catalog::vacuum(TxID tx_id) {
   std::vector<TableId> table_ids_to_vacuum;
   {
     std::shared_lock lock(tables_mutex);
@@ -258,16 +261,16 @@ void Catalog::vacuum() {
   }
 
   for (TableId table_id : table_ids_to_vacuum) {
-    auto table_info = get_table_info(table_id);
+    auto table_info = get_table_info(table_id, tx_id);
     if (table_info != nullptr) {
       table_info->heap_file->vacuum();
     }
   }
 }
 
-const TableInfo* Catalog::get_table_info(const std::string& table_name) {
-  std::shared_lock lock(tables_mutex);
+const TableInfo* Catalog::get_table_info(const std::string& table_name, TxID tx_id) {
   std::string normalized_table_name = normalize(table_name);
+  std::shared_lock lock(tables_mutex);
 
   for (const auto& [table_id, table_info] : table_id2table_info) {
     if (table_info->name == normalized_table_name) {
@@ -275,17 +278,73 @@ const TableInfo* Catalog::get_table_info(const std::string& table_name) {
     }
   };
 
+  for (const auto& [other_tx_id, table_info_vec] : in_process_tables) {
+    for (const auto& table_info : table_info_vec) {
+      if (table_info->name == normalized_table_name && tx_id == other_tx_id) {
+        return table_info.get();
+      }
+    }
+  }
   return nullptr;
 }
 
-const TableInfo* Catalog::get_table_info(TableId table_id) {
+const TableInfo* Catalog::get_table_info(TableId table_id, TxID tx_id) {
   std::shared_lock lock(tables_mutex);
   auto it = table_id2table_info.find(table_id);
   if (it != table_id2table_info.end()) {
     return it->second.get();
   }
 
+  for (const auto& [other_tx_id, table_info_vec] : in_process_tables) {
+    for (const auto& table_info : table_info_vec) {
+      if (table_info->table_id == table_id && tx_id == other_tx_id) {
+        return table_info.get();
+      }
+    }
+  }
   return nullptr;
+}
+
+// called when a transaction that created tables commits
+void Catalog::commit_in_progress_tables(TxID tx_id) {
+  std::unique_lock lock(tables_mutex);
+  auto it = in_process_tables.find(tx_id);
+  if (it == in_process_tables.end()) {
+    return;
+  }
+  for (auto& table_info : it->second) {
+    // Manage if table name already exists
+    for (auto& [_, committed_table_info] : table_id2table_info) {
+      if (table_info->name == committed_table_info->name) {
+        transaction_mgr.abort_transaction(tx_id);
+        throw QueryException(
+            "Cannot commit transaction " + to_string(tx_id) + " because it creates a table with name `" +
+            table_info->name + "` that already exists."
+        );
+      }
+    }
+
+    table_id2table_info.insert({table_info->table_id, std::move(table_info)});
+  }
+  in_process_tables.erase(it);
+}
+
+void Catalog::abort_in_progress_tables(TxID tx_id) {
+  std::unique_lock lock(tables_mutex);
+  auto it = in_process_tables.find(tx_id);
+  if (it != in_process_tables.end()) {
+    for (auto& table_info : it->second) {
+      buffer_mgr.delete_file(table_info->heap_file->file_id);
+      for (auto& index : table_info->indexes) {
+        if (index->get_type() == IndexType::LINEAR_HASH_INDEX){
+          auto casted = static_cast<HashIndex*>(index.get());
+          buffer_mgr.delete_file(casted->buckets_file_id);
+          buffer_mgr.delete_file(casted->dir_file_id);
+        }
+      }
+    }
+    in_process_tables.erase(it);
+  }
 }
 
 FileId Catalog::get_file_id(const std::string& table_name, TableId table_id) {
@@ -293,27 +352,26 @@ FileId Catalog::get_file_id(const std::string& table_name, TableId table_id) {
   return file_mgr.get_file_id(filename);
 }
 
-void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx_id) {
-  auto normalized_table_name = normalize(table_name);
+void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx) {
+  int key_col_idx;
+  auto columns = get_table_info(table_name, tx)->schema->columns;
+  for (size_t c = 0; c < columns.size(); ++c) {
+    if (columns[c].name == column_name) key_col_idx = c;
+  }
 
-  TableInfo* table_info = nullptr;
+  TableInfo* table_info;
   for (const auto& [table_id, tinfo] : table_id2table_info) {
-    if (tinfo->name == normalized_table_name) {
+    if (tinfo->name == table_name) {
       table_info = tinfo.get();
     }
-  }
-  if (table_info == nullptr) {
-    throw QueryException("Table `" + table_name + "` not found");
-  }
+  };
 
-  int key_col_idx = -1;
-  auto columns = table_info->schema->columns;
-  for (size_t c = 0; c < columns.size(); ++c) {
-    if (columns[c].name == column_name)
-      key_col_idx = c;
-  }
-  if (key_col_idx == -1) {
-    throw QueryException("Column `" + column_name + "` not found in table `" + table_name + "`");
+  for (const auto& [other_tx_id, table_info_vec] : in_process_tables) {
+    for (const auto& tinfo : table_info_vec) {
+      if (tinfo->name == table_name && tx == other_tx_id) {
+        table_info = tinfo.get();
+      }
+    }
   }
 
   auto index_count = table_info->indexes.size();
@@ -322,15 +380,15 @@ void Catalog::create_index(const std::string& table_name, const std::string& col
 
   table_info->indexes.push_back(std::make_unique<HashIndex>(*table_info->heap_file, key_col_idx, dir_file_id, buckets_file_id));
 
-  auto iter = table_info->heap_file->get_record_iter(tx_id);
+  auto iter = table_info->heap_file->get_record_iter(tx);
   iter->begin();
   while (!iter->next().invalid()) {
     table_info->indexes[index_count]->insert_record(iter->get_current_RID());
   }
 }
 
-const std::unique_ptr<Index>& Catalog::get_index(const std::string& table_name, IndexId index_id) {
-  auto table_info = get_table_info(table_name);
+const std::unique_ptr<Index>& Catalog::get_index(const std::string& table_name, IndexId index_id, TxID tx) {
+  auto table_info = get_table_info(table_name, tx);
   assert(index_id < table_info->indexes.size());
   return table_info->indexes[index_id];
 }

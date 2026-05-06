@@ -26,9 +26,36 @@ uint64_t Value::get_hash() const {
   } else if (is_string()) {
     auto s = as_string();
     MurmurHash3_x64_128(s.data(), s.length(), 0, _hash);
+  } else {
+    // RID
+    auto rid = as_rid();
+    MurmurHash3_x64_128(&rid, sizeof(rid), 0, _hash);
   }
   return _hash[0];
 }
+
+int64_t Value::encoded() const {
+  if (is_int()) {
+    return as_int();
+  } else if (is_string()) {
+    // construct 8 byte integer with first 8 characters
+    auto str = as_string().data();
+    int64_t res = 0;
+
+    int shift_size = 8 * 7;
+    for (int i = 0; i < 8 && *str != '\0'; i++, str++, shift_size -= 8) {
+      int64_t byte64 = static_cast<int64_t>(*str);
+      res |= byte64 << shift_size;
+    }
+
+    return res;
+  } else {
+    // RID should never
+    assert(false);
+    return 0;
+  }
+}
+
 
 bool Value::operator<(const Value& other) const {
   return value < other.value;

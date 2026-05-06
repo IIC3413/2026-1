@@ -54,13 +54,11 @@ add_library(iic3413db STATIC ${SRCS})
 target_compile_definitions(iic3413db PUBLIC SERD_STATIC)
 
 set(BUILD_TARGETS
-    create_db
-    test_index_insertion
-    test_index_deletion
-    print_table
-    print_index
-    test_redistribute
-    #test_split
+    client
+    server
+    test_build_hash
+    test_hash_iter
+    hash_join_test
 )
 
 # Build targets

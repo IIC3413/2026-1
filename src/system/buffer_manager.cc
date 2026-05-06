@@ -69,8 +69,8 @@ void BufferManager::delete_file(FileId file_id) {
     std::lock_guard<std::mutex> lck(pages_mutex);
     for (int64_t i = 0; i < frame_count; i++) {
       if (frames[i].page_id.file_id == file_id) {
-        frames[i].dirty = false;
-        frames[i].second_chance = false;
+        page_map.erase(frames[i].page_id);
+        frames[i].reset();
       }
     }
   }

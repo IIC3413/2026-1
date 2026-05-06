@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hash_index.h"
-#include "relational_model/record.h"
 #include "storage/rid.h"
 
 // [tuple_count | overflow_pointer] 8 + 8 = 16 bytes

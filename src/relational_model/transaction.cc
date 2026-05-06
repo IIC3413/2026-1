@@ -36,5 +36,10 @@ void Transaction::commit() {
 }
 
 bool Transaction::abort() const {
+  // needs to call every table updated by this transaction to undo
+  // for (const TupleKey& key : first_rids) {
+  //   auto heap_file = catalog.get_table_info(key.table_id, this->id)->heap_file.get();
+  //   heap_file->undo(key.first_rid, this->id);
+  // }
   return false;
 }

@@ -22,6 +22,8 @@ public:
 
   uint64_t get_hash() const;
 
+  int64_t encoded() const;
+
   bool operator<(const Value& other) const;
   bool operator==(const Value& other) const;
 
@@ -73,7 +75,7 @@ public:
     return std::get<int64_t>(value);
   }
 
-  std::string as_string() const {
+  const std::string& as_string() const {
     assert(is_string());
     return std::get<std::string>(value);
   }
