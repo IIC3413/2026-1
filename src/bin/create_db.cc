@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <random>
 
 #include "relational_model/record.h"
 #include "relational_model/schema.h"
@@ -7,45 +8,7 @@
 #include "storage/heap_file/heap_file.h"
 #include "system/catalog.h"
 #include "system/system.h"
-
-/*
-The created tables should be:
-Table R:
-A, B, C
-0, 1,"value: 1"
-1, 1,"value: 2"
-2, 1,"value: 3"
-3, 1,"value: 4"
-4, 1,"value: 5"
-
-Table S:
-A, B, C,
-"a10",1,0
-"a11",1,2
-"a12",1,4
-"a13",1,6
-"a14",1,8
-"a15",1,10
-"a16",1,12
-"a17",1,14
-"a18",1,16
-"a19",1,18
-    .
-    .
-    .
-
-Table T:
-A, B, C,
-0,"9",2
-1,"9",3
-2,"9",4
-3,"9",5
-4,"9",6
-5,"9",7
-6,"9",8
-7,"9",9
-8,"9",10
-*/
+#include "test_datasets.h"
 
 void print_records(const HeapFile& heap_file) {
   auto total_pages = file_mgr.count_pages(heap_file.file_id);
@@ -62,9 +25,9 @@ void print_records(const HeapFile& heap_file) {
 
 void fill_table1(HeapFile& heap_file) {
   // Schema1 = {A: int, B: int, C: str}
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 256; i++) {
     Value valA(i);
-    Value valB(1);
+    Value valB(0);
     Value valC("value: " + std::to_string(i + 1));
 
     std::vector<Value> values = {valA, valB, valC};
@@ -76,6 +39,65 @@ void fill_table1(HeapFile& heap_file) {
 }
 
 void fill_table2(HeapFile& heap_file) {
+  // Schema2 = {A: str, B: int, C: int}
+  for (int i = 0; i < 511; i++) {
+    Value valA("a" + std::to_string(i + 10));
+    Value valB(3);
+    Value valC(2 * i);
+
+    std::vector<Value> values = {valA, valB, valC};
+
+    Record record(values);
+
+    heap_file.insert_record(record, 0);
+  }
+}
+
+void fill_table4(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  Value valA(1);
+  Value valB(0);
+  Value valC(3);
+
+  std::vector<Value> values = {valA, valB, valC};
+
+  Record record(values);
+
+  heap_file.insert_record(record, 0);
+}
+
+void fill_table5(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  for (int i = 0; i < 30; i++) {
+    Value valA(i);
+    Value valB(0);
+    Value valC(i + 2);
+
+    std::vector<Value> values = {valA, valB, valC};
+
+    Record record(values);
+
+    heap_file.insert_record(record, 0);
+  }
+}
+
+void fill_table6(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  for (int i = 0; i < 10; i++) {
+    Value valA(i);
+    Value valB(0);
+    Value valC(i + 2);
+
+    std::vector<Value> values = {valA, valB, valC};
+
+    Record record(values);
+
+    heap_file.insert_record(record, 0);
+  }
+}
+
+
+void fill_table7(HeapFile& heap_file) {
   // Schema2 = {A: str, B: int, C: int}
   for (int i = 0; i < 256; i++) {
     Value valA("a" + std::to_string(i + 10));
@@ -90,11 +112,44 @@ void fill_table2(HeapFile& heap_file) {
   }
 }
 
-void fill_table3(HeapFile& heap_file) {
-  // Schema 3 = {A: int, B: int, C: int}
-  for (int i = 0; i < 9; i++) {
+void fill_table8(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  for (int i = 0; i < 100000; i++) {
     Value valA(i);
-    Value valB(std::to_string(9));
+    Value valB(1);
+    Value valC(i + 2);
+
+    std::vector<Value> values = {valA, valB, valC};
+
+    Record record(values);
+
+    heap_file.insert_record(record, 0);
+  }
+}
+
+void fill_table9(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  for (int i = 0; i < 756; i++) {
+    Value valA(i);
+    Value valB = 1;
+    if (i < 510) {
+      valB = (i % 2) == 0 ? 4 : 5;
+    }
+    Value valC(i + 2);
+
+    std::vector<Value> values = {valA, valB, valC};
+
+    Record record(values);
+
+    heap_file.insert_record(record, 0);
+  }
+}
+
+void fill_table11(HeapFile& heap_file) {
+  // Schema 4 = {A: int, B: int, C: int}
+  for (int i = 0; i < 256; i++) {
+    Value valA(i);
+    Value valB(1);
     Value valC(i + 2);
 
     std::vector<Value> values = {valA, valB, valC};
@@ -113,20 +168,56 @@ int main() {
 
   Schema schema2({{"A", DataType::STR}, {"B", DataType::INT}, {"C", DataType::INT}});
 
-  // Schema schema3({{"A", DataType::INT}, {"B", DataType::STR}, {"C", DataType::INT}});
+  Schema schema4({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema5({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema6({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema7({{"A", DataType::STR}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema8({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema9({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
+
+  Schema schema11({{"A", DataType::INT}, {"B", DataType::INT}, {"C", DataType::INT}});
 
   // Table names:
-  std::string table_name1 = "r";
+  std::string table_name1 = datasets::INSERT_1;
 
-  std::string table_name2 = "s";
+  std::string table_name2 = datasets::INSERT_2;
 
-  // std::string table_name3 = "t";
+  std::string table_name4 = datasets::DELETE_1;
+
+  std::string table_name5 = datasets::DELETE_2;
+
+  std::string table_name6 = datasets::DELETE_3;
+
+  std::string table_name7 = datasets::REDISTRIBUTE_1;
+
+  std::string table_name8 = datasets::REDISTRIBUTE_2;
+
+  std::string table_name9 = datasets::REDISTRIBUTE_3;
+
+  std::string table_name11 = datasets::REDISTRIBUTE_4;
+
 
   // Create tables
   auto table_info1 = catalog.create_table(table_name1, schema1);
   auto table_info2 = catalog.create_table(table_name2, schema2);
-  // auto table_info3 = catalog.create_table(table_name3, schema3);
-  if (table_info1 == nullptr|| table_info2 == nullptr ) {//|| table_info3 == nullptr) {
+  auto table_info4 = catalog.create_table(table_name4, schema4);
+  auto table_info5 = catalog.create_table(table_name5, schema5);
+  auto table_info6 = catalog.create_table(table_name6, schema6);
+  auto table_info7 = catalog.create_table(table_name7, schema7);
+  auto table_info8 = catalog.create_table(table_name8, schema8);
+  auto table_info9 = catalog.create_table(table_name9, schema9);
+  auto table_info11 = catalog.create_table(table_name11, schema11);
+
+
+  if (table_info1 == nullptr || table_info2 == nullptr || table_info4 == nullptr ||
+      table_info5 == nullptr || table_info6 == nullptr || table_info7 == nullptr ||
+      table_info8 == nullptr || table_info9 == nullptr ||
+      table_info11 == nullptr) {
     std::cout << "Error creating tables" << std::endl;
     return EXIT_FAILURE;
   }
@@ -134,11 +225,25 @@ int main() {
   // Fill tables with records
   auto table1 = table_info1->heap_file.get();
   auto table2 = table_info2->heap_file.get();
-  // auto table3 = table_info3->heap_file.get();
+  auto table4 = table_info4->heap_file.get();
+  auto table5 = table_info5->heap_file.get();
+  auto table6 = table_info6->heap_file.get();
+  auto table7 = table_info7->heap_file.get();
+  auto table8 = table_info8->heap_file.get();
+  auto table9 = table_info9->heap_file.get();
+  auto table11 = table_info11->heap_file.get();
+
 
   fill_table1(*table1);
   fill_table2(*table2);
-  // fill_table3(*table3);
+  fill_table4(*table4);
+  fill_table5(*table5);
+  fill_table6(*table6);
+  fill_table7(*table7);
+  fill_table8(*table8);
+  fill_table9(*table9);
+  fill_table11(*table11);
+
 
   std::cout << "Database example_db Created" << std::endl;
 

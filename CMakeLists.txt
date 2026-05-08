@@ -55,12 +55,16 @@ target_compile_definitions(iic3413db PUBLIC SERD_STATIC)
 
 set(BUILD_TARGETS
     create_db
-    test_index_insertion
-    test_index_deletion
-    print_table
-    print_index
-    test_redistribute
-    #test_split
+    compare_index
+    insert_1
+    insert_2
+    delete_1
+    delete_2
+    delete_3
+    redistribute_1
+    redistribute_2
+    redistribute_3
+    redistribute_4
 )
 
 # Build targets
