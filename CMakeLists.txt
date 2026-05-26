@@ -59,6 +59,15 @@ set(BUILD_TARGETS
     test_build_hash
     test_hash_iter
     hash_join_test
+    hash_join_1
+    hash_join_2
+    hash_join_3
+    insert_1
+    insert_2
+    insert_3
+    insert_4
+    iter_1
+    iter_2
 )
 
 # Build targets
