@@ -352,35 +352,45 @@ FileId Catalog::get_file_id(const std::string& table_name, TableId table_id) {
   return file_mgr.get_file_id(filename);
 }
 
-void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx) {
-  int key_col_idx;
-  auto columns = get_table_info(table_name, tx)->schema->columns;
-  for (size_t c = 0; c < columns.size(); ++c) {
-    if (columns[c].name == column_name) key_col_idx = c;
-  }
+void Catalog::create_index(const std::string& table_name, const std::string& column_name, TxID tx_id) {
+  auto normalized_table_name = normalize(table_name);
 
-  TableInfo* table_info;
+  TableInfo* table_info = nullptr;
   for (const auto& [table_id, tinfo] : table_id2table_info) {
-    if (tinfo->name == table_name) {
+    if (tinfo->name == normalized_table_name) {
       table_info = tinfo.get();
     }
-  };
+  }
 
   for (const auto& [other_tx_id, table_info_vec] : in_process_tables) {
     for (const auto& tinfo : table_info_vec) {
-      if (tinfo->name == table_name && tx == other_tx_id) {
+      if (tinfo->name == table_name && tx_id == other_tx_id) {
         table_info = tinfo.get();
       }
     }
   }
 
+  if (table_info == nullptr) {
+    throw QueryException("Table `" + table_name + "` not found");
+  }
+
+  int key_col_idx = -1;
+  auto columns = table_info->schema->columns;
+  for (size_t c = 0; c < columns.size(); ++c) {
+    if (columns[c].name == column_name)
+      key_col_idx = c;
+  }
+  if (key_col_idx == -1) {
+    throw QueryException("Column `" + column_name + "` not found in table `" + table_name + "`");
+  }
+
   auto index_count = table_info->indexes.size();
-  FileId dir_file_id = file_mgr.get_file_id(normalize(table_name) + "." + std::to_string(index_count) + ".dir");
-  FileId buckets_file_id = file_mgr.get_file_id(normalize(table_info->name) + "." + std::to_string(index_count) + ".hidx");
+  FileId dir_file_id = file_mgr.get_file_id(normalized_table_name + "." + std::to_string(index_count) + ".dir");
+  FileId buckets_file_id = file_mgr.get_file_id(normalized_table_name + "." + std::to_string(index_count) + ".hidx");
 
   table_info->indexes.push_back(std::make_unique<HashIndex>(*table_info->heap_file, key_col_idx, dir_file_id, buckets_file_id));
 
-  auto iter = table_info->heap_file->get_record_iter(tx);
+  auto iter = table_info->heap_file->get_record_iter(tx_id);
   iter->begin();
   while (!iter->next().invalid()) {
     table_info->indexes[index_count]->insert_record(iter->get_current_RID());
