@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "test1",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/bin/test_insert",
+            "args": [
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Debug Build"
+        }
+    ]
+}
