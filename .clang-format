@@ -1,0 +1,10 @@
+---
+BasedOnStyle: LLVM
+ColumnLimit: 110
+IndentWidth: 2
+PointerAlignment: Left
+Standard: c++17
+AllowShortFunctionsOnASingleLine: Empty
+PackConstructorInitializers: Never
+AlignAfterOpenBracket: BlockIndent
+BinPackParameters: false
